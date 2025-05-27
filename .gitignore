@@ -1,0 +1,7 @@
+work/
+results/
+input/
+config.ini
+deprecated/
+prompt_templates.json
+last_prompt.txt
