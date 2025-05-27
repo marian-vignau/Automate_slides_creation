@@ -4,11 +4,24 @@
 
 I found a playlist in youtube with the same syllabus of the course I'm giving.
 
-Then I downloaded the video transcriptions, chopped the syllabus of my course in a file per unit and used ia to create the presentations.
+Then I downloaded the video transcriptions, chopped the syllabus of my course in a file per unit and used AI to create the presentations.
+
+## Requirements
+
+To run all this scripts you need:
+
+- `yt-dlp`
+- `fades`
+- an account to access a ai model, like openai or qwen
+- a playlist of youtube videos with the same syllabus of the course
+- the syllabus of the course in a file per unit
+- a powerpoint template.
+- `fish shell` --> this can be easily replaced by `bash` or `zsh`
+
 
 ## Preparations
 
-The ia prompt uses unit plan, these are a simple and short schema for the class objectives.
+The AI prompt uses unit plan, these are a simple and short schema for the class objectives.
 This information should be stored in the input folder, in the UNIT-unit_plan.txt files.
 
 The shell script will create the directory structure and download the video transcriptions from the youtube playlist.
