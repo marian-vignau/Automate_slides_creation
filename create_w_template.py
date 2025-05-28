@@ -1,49 +1,57 @@
 #!/usr/bin/fades
+import random
 import json
 from pathlib import Path
 import sys
 
 from pptx import Presentation  # fades python-pptx
 from pptx.util import Inches
-from pptx.enum.text import PP_ALIGN
-from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE
+from process_template import Layouts
 
 
-def map_layouts(prs):
-    available_layouts = {}
-    for layout in prs.slide_layouts:
-        name = layout.name
-        available_layouts[name] = [name]
-        available_layouts[name].append(name.replace("_", " "))
-        available_layouts[name].append(name.lower().replace("_", " "))
-    map = {"Title Slide": None, "Title and Content": None}
-    for layout, values in available_layouts.items():
-        for key in map:
-            if key.lower() in values:
-                map[key] = layout
-    if not map["Title Slide"]:
-        for layout, values in available_layouts.items():
-            for alternative in ["title only", "title"]:
-                if alternative.lower() in values:
-                    map["Title Slide"] = layout
-                    break
-    if not map["Title and Content"]:
-        for layout, values in available_layouts.items():
-            for alternative in ["content", "object", "blank"]:
-                if alternative.lower() in values:
-                    map["Title and Content"] = layout
-                    break
+def log(*args, **kwargs): ...
 
-    if not map["Title Slide"] or not map["Title and Content"]:
-        sys.exit("No suitable layouts found")
-    return map
+
+def add_title(slide, slide_data):
+    title_parts = slide_data.get("title", [])
+    if not title_parts:
+        return
+
+    title_shape = slide.shapes.title
+    title_shape.text = title_parts[0].lstrip("# ").strip()
+
+    if len(title_parts) > 1 and len(slide.placeholders) > 1:
+        try:
+            for subtitle_placeholder in slide.placeholders:
+                ...
+
+            # subtitle_placeholder = slide.placeholders[-1]
+            subtitle_placeholder.text = title_parts[1]
+        except IndexError:
+            print("No subtitle placeholder found")
+
+
+def search_placeholders(obj):
+    subtitle_placeholder = None
+    for subtitle_placeholder in obj.placeholders:
+        ...
+    return subtitle_placeholder
+
+
+def _search_placeholders(obj):
+    content_placeholder = None
+    for shape in obj.shapes:
+        if shape.has_text_frame and shape.is_placeholder:
+            # if shape.placeholder_format.idx == 1:  # Content placeholder
+            content_placeholder = shape
+    return content_placeholder
 
 
 def create_presentation(template_path, json_path, output_path):
     # Load the template presentation
     prs = Presentation(template_path)
-    map = map_layouts(prs)
+    map = Layouts(template_path)
+    log(map)
 
     if len(prs.slides) > 0:
         print("Warning: Template already contains slides. I can't remove slides...")
@@ -54,41 +62,40 @@ def create_presentation(template_path, json_path, output_path):
 
     for slide_data in slides_data:
         # Determine slide layout
-        title_parts = slide_data.get("title", [])
-        if not title_parts:
-            continue
-
         # Choose layout based on title (assuming first slide is title slide)
+        title_parts = slide_data.get("title", [])
         if len(title_parts) > 1 and "Title Slide" in title_parts[1]:
-            layout = prs.slide_layouts.get_by_name(map["Title Slide"])
+            layout_type = "title"
         else:
-            layout = prs.slide_layouts.get_by_name(map["Title and Content"])
+            layout_type = "title content"
+        layouts = map.get_layouts(layout_type.split(" "))
 
-        # Add slide
-        slide = prs.slides.add_slide(layout)
-
-        # Set title and subtitle
-        title_shape = slide.shapes.title
-        title_shape.text = title_parts[0].lstrip("# ").strip()
-
-        if layout.name == map["Title Slide"] and len(title_parts) > 1:
-            subtitle_placeholder = slide.placeholders[1]
-            subtitle_placeholder.text = title_parts[1]
-
+        if layout_type == "title":
+            layout = layouts[0]
+            slide = prs.slides.add_slide(layout)
+            add_title(slide, slide_data)
         # Add content (bullet points)
         content = slide_data.get("content", [])
         if content:
-            content_placeholder = None
-            for shape in slide.shapes:
-                if shape.has_text_frame and shape.is_placeholder:
-                    if shape.placeholder_format.idx == 1:  # Content placeholder
-                        content_placeholder = shape
-                        break
+            random.shuffle(layouts)
+            for layout in layouts:
+                plh = search_placeholders(layout)
+                if plh:
+                    break
 
-            if content_placeholder:
-                text_frame = content_placeholder.text_frame
+            if not plh:
+                print(
+                    f"No placeholder in {layout.name} found for content: {slide_data}"
+                )
+
+            else:
+                slide = prs.slides.add_slide(layout)
+                # Set title and subtitle
+                add_title(slide, slide_data)
+
+                plh = search_placeholders(slide)
+                text_frame = plh.text_frame
                 text_frame.clear()
-
                 for line in content:
                     line = line.strip()
                     p = text_frame.add_paragraph()
@@ -101,7 +108,7 @@ def create_presentation(template_path, json_path, output_path):
                     for clean_text in text.split("**"):
                         # Basic markdown bold handling
                         run = p.add_run()
-                        run.text = clean_text
+                        run.text = clean_text.replace("*", " ").strip() + " "
                         run.font.bold = bold
                         bold = not bold
 
