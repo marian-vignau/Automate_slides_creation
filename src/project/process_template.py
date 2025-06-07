@@ -48,19 +48,19 @@ class Layouts:
     def process_presentation(self, filename):
         prs = pptx.Presentation(filename)
         map = defaultdict(list)
-        for layout in prs.slide_masters:
+        for idx, layout in enumerate(prs.slide_masters):
             obj = layout.slide_layouts[0]
             if len(obj.shapes) == 0 and len(obj.placeholders) == 0:
                 log(f"{obj.name} dont have shapes")
                 continue
             key = simplify_name(obj.name)
-            map[key].append(obj)
-        for obj in prs.slide_layouts:
+            map[key].append((obj, "slide_masters", idx))
+        for idx, obj in enumerate(prs.slide_layouts):
             if len(obj.shapes) == 0 and len(obj.placeholders) == 0:
                 log(f"{obj.name} dont have shapes")
                 continue
             key = simplify_name(obj.name)
-            map[key].append(obj)
+            map[key].append((obj, "slide_layouts", idx))
         return map
 
     def get_layouts(self, parts):
@@ -70,10 +70,13 @@ class Layouts:
             if len(key) == n:
                 if n == len(set(parts) & set(key)):
                     fit_layouts.extend(values)
-        return fit_layouts
+        return [o[0] for o in fit_layouts]
 
     def __str__(self):
-        vmap = {" ".join(k): [o.name for o in v] for k, v in self.map.items()}
+        vmap = {
+            " ".join(k): [f"{o[1]}#{o[2]}: {o[0].name}" for o in v]
+            for k, v in self.map.items()
+        }
         return pprint.pformat(vmap)
 
 

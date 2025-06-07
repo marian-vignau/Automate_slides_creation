@@ -10,7 +10,15 @@ marks = dict(
     separator=["---"],
     title=["title"],
     visual=["visual idea", "visual", "visuals"],
-    notes=["speaker notes", "notes", "slide", "sample answer", "solution key"],
+    notes=[
+        "speaker notes",
+        "notes",
+        "slide",
+        "sample answer",
+        "solution key",
+        "notas para el presentador",
+        "notas",
+    ],
     content=["text", "content", "subtitle"],
 )
 
@@ -48,7 +56,7 @@ def extract_data(md_file_path):
                     line = line[:-1].strip()
             if not line:
                 continue
-            elif line in marks["separator"]:
+            elif line in marks["separator"] or "---" in line:
                 if current_slide:
                     yield current_slide
                 current_slide = {"title": [], "data": []}
@@ -101,9 +109,12 @@ def parse_markdown(md_file_path):
             if sections["content"]:
                 sections["title"] = sections["content"][0]
                 sections["content"] = sections["content"][1:]
+        clean = re.sub("\[[^>]+?\]", "", "||".join(sections["content"]))
+        sections["content"] = [x.strip() for x in clean.split("||")]
         show(sections)
         show(slide.pop("data"))
         show("---")
+
         yield sections
 
 

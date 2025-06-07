@@ -1,0 +1,3 @@
+{
+    "create_slides": "\nYou are going to teach this content:\n{unit_plan}.\n\nYour class is 1 hour long and you are going to teach remotly.\nCreate a slide deck with 25 slides with short and easy sentences.\nYou can include some unicode emojis mixed in the content to improve the visuals.\nAdd some slides that are for students to practice the content.\nAdd speaker notes bellow each slide to include\n* include the solution key for the exercises\n* suggests some visuals.\n* additional explanations to review and teach.\n\nCreate a markdown file and hide all the traces of your presence.\n\nYou have a video transcription as guide on how to teach this content.\n\n{transcription}\n\n        "
+}

@@ -1,7 +1,21 @@
+# .gitignore
+
+# Build artifacts
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+dist/
+temp/
 work/
-results/
 input/
-config.ini
+output/
+results/
 deprecated/
-prompt_templates.json
-last_prompt.txt
+config.*
+
+# Virtual environments
+.venv/
+env/

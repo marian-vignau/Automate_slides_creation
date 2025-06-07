@@ -1,7 +1,6 @@
 #!/usr/bin/fades
 
-from typing import Dict, Any
-import toml
+from typing import Dict
 from pathlib import Path
 import argparse
 import subprocess
@@ -12,7 +11,7 @@ import openai  # fades
 
 # Configuration file path
 CONFIG_FILE = Path("config.ini")
-PROMPT_TEMPLATES_FILE = Path("prompt_templates.toml")
+PROMPT_TEMPLATES_FILE = Path("prompt_templates.json")
 
 
 def initialize_config() -> configparser.ConfigParser:
@@ -71,33 +70,13 @@ def check_prompt_templates(file_path: Path = PROMPT_TEMPLATES_FILE) -> Dict[str,
     prompt_template = dict()
     flag = False
     if not prompt_template.get("create_slide", ""):
-        prompt_template[
-            "create_slides"
-        ] = """
-You are going to teach this content:
-{unit_plan}.
-
-Your class is 1 hour long and you are going to teach remotly.
-Create a slide deck with 25 slides with short and easy sentences.
-You can include some unicode emojis mixed in the content to improve the visuals.
-Add some slides that are for students to practice the content.
-Add speaker notes bellow each slide to include
-* include the solution key for the exercises
-* suggests some visuals.
-* additional explanations to review and teach.
-
-Create a markdown file and hide all the traces of your presence.
-
-You have a video transcription as guide on how to teach this content.
-
-{transcription}
-
-        """
         flag = True
+
+        prompt_template["create_slides"] = PROMPT_TEMPLATE
 
     if flag:
         with file_path.open("w", encoding="utf-8") as f:
-            toml.dump(prompt_template, f)
+            json.dump(prompt_template, f, indent=4)
         print(f"Prompt templates saved to {file_path}")
     return prompt_template
 
@@ -190,11 +169,29 @@ def main() -> None:
     )
     write_file(Path("last_prompt.txt"), prompt)
     print(f"Prompt has {len(prompt)} characters and {len(prompt.split('\n'))} lines")
+    slides = generate_chat_completion(prompt, config)
 
-    # slides = generate_chat_completion(prompt, config)
-
-    # write_file(args.output, slides)
+    write_file(args.output, slides)
 
 
 if __name__ == "__main__":
     main()
+
+PROMPT_TEMPLATE = """
+You are going to teach this content:
+{unit_plan}.
+
+Your class is 1 hour long and you are going to teach remotly.
+Create a slide deck with 25 slides with short and easy sentences.
+You can include some unicode emojis mixed in the content to improve the visuals.
+Add some slides that are for students to practice the content.
+Add speaker notes bellow each slide to include
+* include the solution key for the exercises
+* suggests some visuals.
+* additional explanations to review and teach.
+
+Create a markdown file and hide all the traces of your presence.
+
+You have a video transcription as guide on how to teach this content.
+
+{transcription} """

@@ -1,0 +1,5 @@
+[project]
+name = "Automate_slides_creation"
+version = "0.1.0"
+description = "Automate slides creation using AI and pptx templates"
+dependencies = ["pypdf2", "python-pptx", "markdown2", "openai", "rich"]

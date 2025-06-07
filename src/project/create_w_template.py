@@ -145,10 +145,13 @@ if __name__ == "__main__":
     source_json = sys.argv[1]
     template_ppt = sys.argv[2]
     output_ppt = sys.argv[3]
+    fn = Path(source_json).expanduser().resolve()
+    if not fn.exists():
+        sys.exit(f"Source JSON file not found: {source_json}")
+
     fn = Path(template_ppt).expanduser().resolve()
     if not fn.exists():
         sys.exit(f"Template file not found: {template_ppt}")
-
     create_presentation(
         template_path=str(fn), json_path=source_json, output_path=output_ppt
     )

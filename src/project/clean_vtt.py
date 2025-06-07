@@ -1,6 +1,6 @@
 import argparse
-import sys
 import re
+import sys
 from pathlib import Path
 
 
@@ -21,6 +21,7 @@ def filter_lines(input_file):
 
 
 def process_lines(input_file):
+    "Replace some HTML tags and remove empty lines."
     before = ""
     for line in filter_lines(input_file):
         plain_text = re.sub("<[^>]+>", " ", line)
@@ -33,7 +34,7 @@ def process_lines(input_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Convert Markdown to PowerPoint Presentation"
+        description="Cleans a VTT file for use in IA prompting"
     )
     parser.add_argument(
         "--input",
