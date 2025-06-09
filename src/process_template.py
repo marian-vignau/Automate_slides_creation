@@ -87,14 +87,10 @@ class Layout:
         name = slide.name.strip().lower()
         return Layout(name=name, typ="slide", position=0, obj=slide)
 
-    def get_fitting(self, slide_data):
+    def get_fitting(self, data):
         fit = 0
         fitted = {}
         matched_ph = {}
-        data = {}
-        for k, v in slide_data.items():
-            if len(v) and k not in ["notes", "visual"]:
-                data[k] = v
 
         for orig in data.keys():
             candidates = {}

@@ -88,19 +88,32 @@ def add_images_notes_(slide, slide_data):
     notes_slide.notes_text_frame.text = "\n".join(notes)
 
 
+def on_slide(part, value):
+    if len(value) and part not in ["notes", "visual", "index"]:
+        return True
+    return False
+
+
 def add_slide(prs, slide_data, map):
-    layouts = map.get_fitted_layouts(slide_data)
+    showed_data = {k: v for k, v in slide_data.items() if on_slide(k, v)}
+    layouts = map.get_fitted_layouts(showed_data)
     random.shuffle(layouts)
     layout = layouts[0]
     slide = prs.slides.add_slide(layout.obj)
 
     layout = Layout.new_from_slide(slide)
-    _, placeholders = layout.get_fitting(slide_data)
-    # output(placeholders)
-    for part in ["title", "content"]:
-        if placeholders[part]:
+    # output("Showed data", showed_data)
+    _, placeholders = layout.get_fitting(showed_data)
+
+    # output("placeholders", placeholders)
+    for part, v in slide_data.items():
+        if not on_slide(part, v):
+            continue
+
+        if placeholders.get(part):
             add_content(placeholders[part].obj, slide_data[part])
         else:
+            output(f"Placeholder not found: {part} for slide {slide_data['index']}")
             slide_data["notes"].extend(
                 ["Placeholder not found:"] + [part] + slide_data[part]
             )
