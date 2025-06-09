@@ -42,25 +42,15 @@ if __name__ == "__main__":
         type=Path,
         help="Path to the input file in vtt format",
     )
-    """
-    parser.add_argument(
-        "--output",
-        "-o",
-        type=Path,
-        default="presentation.pptx",
-        help="Path to the output file.",
-    )
-    parser.add_argument(
-        "--template",
-        "-t",
-        type=str,
-        default="",
-        help="Path to the template PowerPoint file (default: None)",
-    )
-    """
-    # add a template argument
     args = parser.parse_args()
     if not Path(args.input).exists:
         sys.exit(f"Input file {args.input} does not exist")
+    preamble = {"WEBVTT", "Kind:", "Language:"}
+    preamble_lines = 0
     for line in process_lines(args.input):
-        print(line)
+        if preamble_lines < len(preamble):
+            if not any(line.startswith(p) for p in preamble):
+                sys.exit(f"Input file {args.input} is not a vtt file {line}")
+            preamble_lines += 1
+        else:
+            print(line)

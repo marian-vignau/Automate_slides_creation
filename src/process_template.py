@@ -1,44 +1,121 @@
 #!/usr/bin/fades
 import pprint
+from dataclasses import dataclass
 from collections import defaultdict
 import sys
 from pathlib import Path
 import pptx  # fades python-pptx
+from rich.console import Console  # fades rich
 
-replaces = """
-only,with,and,section=
-_object,_picture=_column
-description,text,picture,body,one_column=content
-big number,caption,header,main point=title
-"""
-repla = dict()
-for line in replaces.split("\n"):
-    if "=" in line:
-        value, key = line.split("=")
-        repla[key] = value.split(",")
+console = Console()
 
 
-def log(*args, **kwargs): ...
+def output(*args): ...
 
 
-def simplify_name(name):
-    name = name.lower()
-    for c in "0123456789_-.,":
-        name = name.replace(c, " ")
-    name = name.strip() + " "
+# for arg in args:
+#     console.print(arg)
+#
 
-    for card in "one,two,three,four,five,six,seven,eight,nine".split(","):
-        if card + " " in name:
-            name = name.replace(card + " ", card + "_")
-    name = name.replace("s ", " ")
-    for key, values in repla.items():
-        for value in values:
-            if value in name:
-                name = name.replace(value, key)
 
-    words = set(x.strip() for x in name.split(" ") if x.strip())
-    words = sorted(list(words))
-    return tuple(words)
+@dataclass
+class Placeholder:
+    obj: object
+    index: int
+    space: int
+    typ: str
+
+    @classmethod
+    def create(cls, obj, index):
+        new = cls(obj, index, 0, "placeholder")
+        try:
+            new.space = len(obj.text_frame.paragraphs)
+        except AttributeError:
+            new.space = 0
+        new.typ = obj.placeholder_format.type.name.lower()
+        if new.typ in ["title", "center_title", "subtitle", "body", "content"]:
+            if new.typ == "body":
+                new.typ = "content"
+            return new
+        return None
+
+    @staticmethod
+    def type_match(orig, new):
+        content = ["subtitle", "body", "content"]
+        if orig == new:
+            return 100
+        if orig in content and new in content:
+            if orig == content[0] or new == content[0]:
+                return 70
+            return 80
+        if "title" in orig and "title" in new:
+            return 80
+        return 0
+
+    def __repr__(self):
+        return f"<PH> {self.typ}#{self.index} {self.obj.name}"
+
+
+@dataclass
+class Layout:
+    name: str
+    typ: str
+    position: int
+    obj: object
+
+    def __repr__(self):
+        s = f"<Layout> {self.name} {self.typ}#{self.position}\n"
+        return s + pprint.pformat(self.placeholders)
+
+    @property
+    def placeholders(self):
+        phds = self.obj.placeholders
+        places = {}
+        for idx, ph in enumerate(phds):
+            pho = Placeholder.create(ph, idx)
+            if pho is not None:
+                places[idx] = pho
+        return places
+
+    @classmethod
+    def new_layout(cls, typ, position, obj):
+        name = obj.name.strip().lower()
+        return Layout(name=name, typ=typ, position=position, obj=obj)
+
+    @classmethod
+    def new_from_slide(cls, slide):
+        name = slide.name.strip().lower()
+        return Layout(name=name, typ="slide", position=0, obj=slide)
+
+    def get_fitting(self, slide_data):
+        fit = 0
+        fitted = {}
+        matched_ph = {}
+        data = {}
+        for k, v in slide_data.items():
+            if len(v) and k not in ["notes", "visual"]:
+                data[k] = v
+
+        for orig in data.keys():
+            candidates = {}
+            pho = None
+            for idx, pho in self.placeholders.items():
+                if idx in fitted:
+                    continue
+                candidates[idx] = Placeholder.type_match(orig, pho.typ)
+            if candidates:
+                max_candidate = max(candidates.values())
+                for idx, fit in candidates.items():
+                    if fit == max_candidate:
+                        matched_ph[orig] = self.placeholders[idx]
+                        fitted[idx] = max_candidate
+                        break
+
+        for orig in data.keys():
+            if orig not in matched_ph:
+                return 0, matched_ph
+
+        return sum(fitted.values()), matched_ph
 
 
 class Layouts:
@@ -47,37 +124,30 @@ class Layouts:
 
     def process_presentation(self, filename):
         prs = pptx.Presentation(filename)
-        map = defaultdict(list)
+        map = []
         for idx, layout in enumerate(prs.slide_masters):
             obj = layout.slide_layouts[0]
-            if len(obj.shapes) == 0 and len(obj.placeholders) == 0:
-                log(f"{obj.name} dont have shapes")
-                continue
-            key = simplify_name(obj.name)
-            map[key].append((obj, "slide_masters", idx))
+            layout = Layout.new_layout("slide_master", idx, obj)
+            if layout:
+                map.append(layout)
         for idx, obj in enumerate(prs.slide_layouts):
-            if len(obj.shapes) == 0 and len(obj.placeholders) == 0:
-                log(f"{obj.name} dont have shapes")
-                continue
-            key = simplify_name(obj.name)
-            map[key].append((obj, "slide_layouts", idx))
+            layout = Layout.new_layout("slide_layout", idx, obj)
+            if layout:
+                map.append(layout)
         return map
 
-    def get_layouts(self, parts):
-        fit_layouts = []
-        n = len(parts)
-        for key, values in self.map.items():
-            if len(key) == n:
-                if n == len(set(parts) & set(key)):
-                    fit_layouts.extend(values)
-        return [o[0] for o in fit_layouts]
+    def get_fitted_layouts(self, slide_data):
+        fitting_map = defaultdict(list)
+        for layout in self.map:
+            fit, _ = layout.get_fitting(slide_data)
+            fitting_map[fit].append(layout)
+            output(f"=== {layout.name} {fit}", _)
+            output(layout)
+        max_fit = max(fitting_map.keys())
+        return fitting_map[max_fit]
 
     def __str__(self):
-        vmap = {
-            " ".join(k): [f"{o[1]}#{o[2]}: {o[0].name}" for o in v]
-            for k, v in self.map.items()
-        }
-        return pprint.pformat(vmap)
+        return pprint.pformat([str(i) for i in self.map])
 
 
 if __name__ == "__main__":
@@ -89,7 +159,11 @@ if __name__ == "__main__":
     if not fn.exists():
         sys.exit(f"File not found: {fn}")
     map = Layouts(fn)
-    print(map)
 
-    fit = map.get_layouts(["title", "content"])
-    print([o.name for o in fit])
+    slide_data = dict(
+        title=["title of the slide"], content=["content line", "content tow"]
+    )
+    fit = map.get_layouts(slide_data)
+    pprint.pprint([str(i) for i in fit])
+
+    pprint.pprint("l fin")

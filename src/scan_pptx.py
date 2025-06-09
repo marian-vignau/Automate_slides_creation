@@ -3,17 +3,13 @@ from pathlib import Path
 import argparse
 from process_template import Layouts  # fades python-pptx
 from rich.console import Console  # fades rich
+
 from rich.table import Table
 from functools import lru_cache
-import debugpy  # fades
-import platform
-
-# debugpy.listen((platform.node(), 5678))
-# print(f"debugpy listening on {platform.node()}:5678", flush=True)
-# debugpy.wait_for_client()
 
 
-def log(msg): ...
+def log(*args):
+    Console().print(*args)
 
 
 # Your processing function — this is where you'd do something useful with each .pptx file
@@ -47,6 +43,10 @@ def collect_pptx_metadata(start_path):
 
 
 # Display metadata in a rich table
+def display_metadata_table_(data, headers):
+    log(headers, len(data))
+
+
 def display_metadata_table(data, headers):
     console = Console()
 
@@ -57,7 +57,7 @@ def display_metadata_table(data, headers):
         else:
             table.add_column(header, justify="right")
 
-    for item in data:
+    for idx, item in enumerate(data):
         row = []
         for header in headers:
             if header in item:
@@ -65,7 +65,10 @@ def display_metadata_table(data, headers):
             else:
                 row.append("")
 
-        table.add_row(*row)
+        if idx % 2 == 0:
+            table.add_row(*row, style="bold")
+        else:
+            table.add_row(*row, style="dim")
 
     console.print(table)
 
