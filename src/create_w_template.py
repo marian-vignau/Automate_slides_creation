@@ -1,5 +1,6 @@
 #!/usr/bin/fades
 import warnings
+import argparse
 import random
 import json
 from pathlib import Path
@@ -33,6 +34,11 @@ def _null_warning(*args, **kwargs): ...
 
 
 warnings.showwarning = _null_warning  # Suppress all direct warning outputs
+
+
+def debug(*args):
+    if VERBOSE:
+        output(*args)
 
 
 def output(*args):
@@ -123,9 +129,13 @@ def add_slide(prs, slide_data, map):
     return 0
 
 
-def create_presentation(template_path, json_path, output_path):
+def create_presentation(json_path, output_path, template_path):
     # Load the template presentation
-    prs = Presentation(template_path)
+    debug(f"{template_path=} {output_path=}")
+    if template_path:
+        prs = Presentation(template_path)
+    else:
+        prs = Presentation()
     map = Layouts(template_path)
 
     previous_slides = len(prs.slides)
@@ -156,25 +166,60 @@ def create_presentation(template_path, json_path, output_path):
     )
 
 
-# Usage
+# Command-line interface setup
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        output(
-            "Usage: python create_w_template.py <source.json> <template.potx> <output.pptx>"
-        )
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Create the power point presentation from the json file."
+    )
+    parser.add_argument(
+        "--input",
+        "-i",
+        type=str,
+        required=True,
+        help="Path to the input json file",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        default="presentation.pptx",
+        help="Path to the output powerpoint file (default: presentation.pptx)",
+    )
+    parser.add_argument(
+        "--template",
+        "-t",
+        type=str,
+        default=None,
+        help="Path to the templetate powerpoint file.",
+    )
 
-    source_json = sys.argv[1]
-    template_ppt = sys.argv[2]
-    output_ppt = sys.argv[3]
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Prints information (default: False)",
+    )
+
+    # add a template argument
+    args = parser.parse_args()
+
+    global VERBOSE
+    VERBOSE = args.verbose
+
+    source_json = args.input
+    template_ppt = args.template
+    output_ppt = args.output
     fn = Path(source_json).expanduser().resolve()
     if not fn.exists():
         sys.exit(f"Source JSON file not found: {source_json}")
 
-    fn = Path(template_ppt).expanduser().resolve()
-    if not fn.exists():
-        sys.exit(f"Template file not found: {template_ppt}")
+    template_path = None
+    if template_ppt:
+        fn = Path(template_ppt).expanduser().resolve()
+        if not fn.exists():
+            sys.exit(f"Template file not found: {template_ppt}")
+        template_path = str(fn)
     stats = create_presentation(
-        template_path=str(fn), json_path=source_json, output_path=output_ppt
+        json_path=source_json, output_path=output_ppt, template_path=template_path
     )
     output(stats, f"Template applied and saved to: {output_ppt}")
