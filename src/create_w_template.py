@@ -113,7 +113,7 @@ def add_slide(prs, slide_data, map):
         if placeholders.get(part):
             add_content(placeholders[part].obj, slide_data[part])
         else:
-            output(f"Placeholder not found: {part} for slide {slide_data['index']}")
+            output(f"Placeholder not found: {part} for slide {slide_data.get(part,'')}")
             slide_data["notes"].extend(
                 ["Placeholder not found:"] + [part] + slide_data[part]
             )

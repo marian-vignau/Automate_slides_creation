@@ -3,10 +3,10 @@
 from typing import Dict
 from pathlib import Path
 import argparse
-import subprocess
 import configparser
 import json
 import sys
+import subprocess
 import openai  # fades
 
 # Configuration file path
@@ -39,26 +39,6 @@ def initialize_config() -> configparser.ConfigParser:
     return config
 
 
-def load_prompt_templates(file_path: Path = PROMPT_TEMPLATES_FILE) -> Dict[str, str]:
-    """
-    Loads prompt templates from a JSON file.
-
-    Args:
-        file_path (Path): Path to the file containing prompt templates.
-
-    Returns:
-        Dict[str, str]: A dictionary of prompt templates.
-    """
-    if not file_path.exists():
-        print(f"No prompt templates found at {file_path}. Using default templates.")
-        return {}
-
-    with file_path.open("r", encoding="utf-8") as f:
-        templates = json.load(f)
-    print(f"Prompt templates loaded from {file_path}")
-    return templates
-
-
 def check_prompt_templates(file_path: Path = PROMPT_TEMPLATES_FILE) -> Dict[str, str]:
     """Stores a dictionary of prompt templates to a JSON file.
 
@@ -79,6 +59,27 @@ def check_prompt_templates(file_path: Path = PROMPT_TEMPLATES_FILE) -> Dict[str,
             json.dump(prompt_template, f, indent=4)
         print(f"Prompt templates saved to {file_path}")
     return prompt_template
+
+
+def load_prompt_templates(file_path: Path = PROMPT_TEMPLATES_FILE) -> Dict[str, str]:
+    """
+    Loads prompt templates from a JSON file.
+
+    Args:
+        file_path (Path): Path to the file containing prompt templates.
+
+    Returns:
+        Dict[str, str]: A dictionary of prompt templates.
+    """
+
+    if not file_path.exists():
+        print(f"No prompt templates found at {file_path}. Using default templates.")
+        return {}
+
+    with file_path.open("r", encoding="utf-8") as f:
+        templates = json.load(f)
+    print(f"Prompt templates loaded from {file_path}")
+    return templates
 
 
 def update_config(

@@ -2,7 +2,6 @@
 import pprint
 import re
 import argparse
-import markdown2  # fades
 import json
 
 
@@ -13,6 +12,7 @@ marks = dict(
     notes=[
         "speaker notes",
         "notes",
+        "teacher notes",
         "slide",
         "sample answer",
         "solution key",
@@ -28,86 +28,119 @@ def show(*args, **kwargs):
         pprint.pprint(*args, **kwargs)
 
 
-def extract_data(md_file_path):
-    # Parse slides from Markdown
-    current_slide = {"title": [], "data": [], "index": []}
+def clean_line(line: str):
+    """Eliminate lines without content, outer parenthesis and enumerations."""
+    line_ = line.replace("*", "").replace("`", "").replace("-", "").strip()
+    if not line_:
+        return None
+
+    # process enumerations
+    while len(line) > 1:
+        if line.startswith("* ") or line.startswith("- "):
+            line = line[1:].strip()
+        elif line.startswith("("):
+            line = line[1:].strip()
+            if line.endswith(")"):
+                line = line[:-1].strip()
+        else:
+            break
+    return line
+
+
+def chop_slides(md_file_path):
+    """Separate slides in markdown file."""
+    current_slide = []
     count_backticks = 0
-    n_slides = 1
     with open(md_file_path, "r", encoding="utf-8") as f:
         for line in f.readlines():
             line = line.strip()
+            # sometimes, it adds backticks to show this is md
             if line.startswith("```"):
                 count_backticks += 1
                 continue
-
             if count_backticks > 0 and count_backticks % 2 == 0:
                 continue
-            elif line in marks["separator"] or "---" in line:
+
+            if line in marks["separator"] or "---" in line:
                 if current_slide:
                     yield current_slide
-                current_slide = {"title": [], "data": [], "index": []}
-                n_slides += 1
-                continue
-            line_ = line.replace("*", "").replace("`", "").replace("-", "").strip()
-            if not line_:
-                continue
-            if line.startswith("- "):
-                line = line[1:].strip()
-            if line.startswith("("):
-                line = line[1:].strip()
-                if line.endswith(")"):
-                    line = line[:-1].strip()
-            if line.startswith("* "):
-                line = line[1:].strip()
+                current_slide = []
+            else:
+                if c_line := clean_line(line):
+                    current_slide.append(c_line)
 
-            if line.startswith("#"):
-                for i in range(len(line)):
-                    if line[i] != "#":
-                        break
-                title = line[i:].strip()
-                if "Slide" in title:
-                    pos = title.find("Slide")
-                    current_slide["index"] = [title[pos : pos + len("Slide NNN")]]
-                    if ":" in title[pos:]:
-                        title = title.split(":")[-1].strip()
-                    if " - " in title[pos:]:
-                        title = title.split(" – ")[-1].strip()
-                elif not current_slide["index"]:
-                    current_slide["index"] = [f"Slide {n_slides}"]
-                current_slide["title"].append(title)
-            elif current_slide is not None:
-                current_slide["data"].append(line)
-
-        if current_slide is not None:
+        if current_slide:
             yield current_slide
 
 
-def clean_text(lines, remove_tags=True, remove_md=True):
-    clean = "||".join(lines)
-    if remove_tags:
-        clean = re.sub(r"\[[^>]+?\]", "", clean)
-        clean = re.sub(r"\<[^>]+?\>", "", clean)
-    if remove_md:
-        clean = clean.replace("*", "").strip()
-    result = []
-    viewed = set()
-    for line in clean.split("||"):
-        line_ = (
-            line.replace("*", "")
-            .replace("`", "")
-            .replace("-", "")
-            .replace("#", "")
-            .lower()
-            .strip()
-        )
-        if line_ and line_ not in viewed:
-            result.append(line)
-            viewed.add(line)
-    return result
+def process_title(line: str):
+    """Extract title and index from line."""
+    i = 0
+    for i in range(len(line)):
+        if line[i] != "#":
+            break
+    title = line[i:]
+    index = None
+
+    if "Slide" in title:
+        pos = title.find("Slide")
+        index = title[pos : pos + len("Slide NNN")].replace(":", "").strip()
+        if ":" in title[pos:]:
+            title = title.split(":")[-1].strip()
+        if " - " in title[pos:]:
+            title = title.split(" – ")[-1]
+    return title.strip(), index
 
 
-def parse_markdown(md_file_path):
-    """Reads Markdown file and parses it."""
+def separate_title(slide_md, n_slide):
+    """Separate title and index from slide data."""
+    current_slide = {"index": [], "title": [], "data": []}
+    for line in slide_md:
+        # process titles
+        if line.startswith("#"):
+            title, index = process_title(line)
+            if index:
+                current_slide["index"] = [index]
+            else:
+                current_slide["index"] = [f"Slide {n_slide}"]
+            current_slide["title"].append(title)
+
+        elif current_slide is not None:
+            current_slide["data"].append(line)
+    return current_slide
+
+
+def remove_emojis(line):
+    # Regular expression pattern for matching emojis
+    text = (
+        line.replace("*", "")
+        .replace("`", "")
+        .replace("-", "")
+        .replace("#", "")
+        .lower()
+        .strip()
+    )
+    emoji_pattern = re.compile(
+        "["
+        "\U0001f600-\U0001f64f"  # emoticons
+        "\U0001f300-\U0001f5ff"  # symbols & pictographs
+        "\U0001f680-\U0001f6ff"  # transport & map symbols
+        "\U0001f700-\U0001f77f"  # alchemical symbols
+        "\U0001f780-\U0001f7ff"  # Geometric Shapes Extended
+        "\U0001f800-\U0001f8ff"  # Supplemental Symbols and Pictographs
+        "\U0001f900-\U0001f9ff"  # Supplemental Symbols and Pictographs
+        "\U0001fa00-\U0001fa6f"  # Chess symbols
+        "\U0001fa70-\U0001faff"  # Symbols and Pictographs Extended-A
+        "\U00002702-\U000027b0"  # Dingbats
+        "\U000024c2-\U0001f251"
+        "]+",
+        flags=re.UNICODE,
+    )
+    return emoji_pattern.sub(r"", text)
+
+
+def parse_sections(data):
+    """Reads Markdown in data and split in sections."""
 
     def add_to_section(section, line):
         if section in sections:
@@ -115,55 +148,85 @@ def parse_markdown(md_file_path):
                 sections[section].append(line)
 
     #  Process content and extract speaker notes and visual ideas
-    for slide in extract_data(md_file_path):
-        sections = dict(
-            index=slide["index"],
-            title=slide["title"],
-            subtitle=[],
-            content=[],
-            visual=[],
-            notes=[],
-        )
-        section = "content"
-        for line in slide["data"]:
-            processed = False
-            line_ = line.lower().replace("*", "").strip()
-            if ":" in line_:
-                tag = line_.split(":")[0]
+    sections = dict(
+        subtitle=[],
+        content=[],
+        visual=[],
+        notes=[],
+    )
+    section = "content"
+    for line in data:
+        processed = False
+        if ":" in line:
+            line_ = remove_emojis(line)
+            tag = line_.split(":")[0].replace(":", "").strip()
+            for k in marks:
+                if tag in marks[k]:
+                    if k in sections:
+                        section = k
+                        add_to_section(section, line.split(":")[-1].strip())
+                        processed = True
+                    break
+        if not processed:
+            add_to_section(section, line)
+    return sections
 
-                for k in marks:
-                    if tag in marks[k]:
-                        if k in sections:
-                            section = k
-                            add_to_section(section, line.split(":")[-1].strip())
-                            processed = True
-                        break
-            if not processed:
-                add_to_section(section, line)
 
-        for key, value in sections.items():
-            if key in ["title", "content"]:
-                sections[key] = clean_text(value, remove_md=False)
-            else:
-                sections[key] = clean_text(value, remove_tags=False)
+def clean_text(lines, remove_tags=False, remove_md=False):
+    """Remove unwanted elements from a section."""
+    clean = "||".join(lines)
+    if remove_tags:
+        clean = re.sub(r"\[[^>]+?\]", "", clean)
+        clean = re.sub(r"\<[^>]+?\>", "", clean)
+    if remove_md:
+        clean = clean.replace("*", "").strip()
+    #
+    # Remove duplicated lines
+    result = []
+    viewed = set()
+    for line in clean.split("||"):
+        line_ = remove_emojis(line)
+        if line_ and line_ not in viewed:
+            result.append(line)
+            viewed.add(line)
+    return result
 
-        if not sections["title"]:
-            if sections["content"]:
-                sections["title"] = sections["content"][0]
-                sections["content"] = sections["content"][1:]
-        if len(sections["title"]) > 1:
-            sections["subtitle"] = sections["title"][1:]
-            sections["title"] = [sections["title"][0]]
-        if len(sections["content"]) == 1:
-            if not sections.get("subtitle"):
-                sections["subtitle"] = sections["content"]
-                sections["content"] = []
 
-        show(sections)
-        show(slide.pop("data"))
-        show("---")
+def polish_slide(slide: dict):
+    """Final cleansing and formating."""
+    for key, value in slide.items():
+        if key in ["title", "content", "subtitle"]:
+            slide[key] = clean_text(value, remove_tags=True)
+        else:
+            slide[key] = clean_text(value, remove_md=True)
 
-        yield sections
+    # if there are no titles, use the first line as title
+    if not slide["title"]:
+        if slide["content"]:
+            slide["title"] = [slide["content"][0]]
+            slide["content"] = slide["content"][1:]
+    # if title has multiple lines, use the last ones as subtitle
+    if len(slide["title"]) > 1:
+        slide["subtitle"] = slide["title"][1:]
+        slide["title"] = [slide["title"][0]]
+    # if the content has only one line, use as subtitle
+    if len(slide["content"]) == 1:
+        if not slide.get("subtitle"):
+            slide["subtitle"] = slide["content"]
+            slide["content"] = []
+    return slide
+
+
+def parse_markdown(md_file_path):
+    """Parse markdown and separate slide data in sections."""
+    for n_slide, slide_md in enumerate(chop_slides(md_file_path), start=1):
+        slide = separate_title(slide_md, n_slide)
+        sections = parse_sections(slide.pop("data"))
+        slide.update(sections)
+        slide = polish_slide(slide)
+        show(slide)
+        show("-=- " * 3)
+        yield slide
 
 
 # Command-line interface setup
@@ -187,8 +250,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--verbose",
         "-v",
-        type=bool,
-        default=False,
+        action="store_true",
         help="Prints the parsed slides (default: False)",
     )
 
