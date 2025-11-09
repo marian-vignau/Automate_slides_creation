@@ -1,4 +1,5 @@
 #!/usr/bin/fades
+import unicodedata
 import pprint
 import re
 import argparse
@@ -7,8 +8,8 @@ import json
 
 marks = dict(
     separator=["---"],
-    title=["title", "título"],
-    visual=["visual idea", "visual", "visuals"],
+    subtitle=["title", "título", "titulo"],
+    visual=["visual idea", "visual", "visuals", "ayuda visual"],
     notes=[
         "speaker notes",
         "notes",
@@ -17,6 +18,7 @@ marks = dict(
         "sample answer",
         "solution key",
         "notas para el presentador",
+        "notas del orador",
         "notas",
     ],
     content=["text", "content", "subtitle"],
@@ -42,6 +44,8 @@ def clean_line(line: str):
             line = line[1:].strip()
             if line.endswith(")"):
                 line = line[:-1].strip()
+        if line.startswith("** "):
+            line = line[1:].strip()
         else:
             break
     return line
@@ -52,14 +56,15 @@ def chop_slides(md_file_path):
     current_slide = []
     count_backticks = 0
     with open(md_file_path, "r", encoding="utf-8") as f:
+
         for line in f.readlines():
             line = line.strip()
             # sometimes, it adds backticks to show this is md
             if line.startswith("```"):
                 count_backticks += 1
-                continue
-            if count_backticks > 0 and count_backticks % 2 == 0:
-                continue
+            #:while:w    continue
+            # if count_backticks > 0 and count_backticks % 2 == 0:
+            #    continue
 
             if line in marks["separator"] or "---" in line:
                 if current_slide:
@@ -136,7 +141,14 @@ def remove_emojis(line):
         "]+",
         flags=re.UNICODE,
     )
-    return emoji_pattern.sub(r"", text)
+    text = emoji_pattern.sub(r"", text)
+    # 1) decompose characters into base + combining marks (NFD)
+    # 2) throw away everything whose Unicode category starts with 'M' (Mark)
+    # 3) re-compose what is left (NFKC keeps normal ASCII as-is)
+    return unicodedata.normalize(
+        "NFKC",
+        unicodedata.normalize("NFD", text).encode("ascii", "ignore").decode("ascii"),
+    )
 
 
 def parse_sections(data):
@@ -159,6 +171,7 @@ def parse_sections(data):
         processed = False
         if ":" in line:
             line_ = remove_emojis(line)
+            show(line_)
             tag = line_.split(":")[0].replace(":", "").strip()
             for k in marks:
                 if tag in marks[k]:
@@ -244,7 +257,7 @@ if __name__ == "__main__":
         "-o",
         type=str,
         default="presentation.json",
-        help="Path to the output json file (default: presentation.pptx)",
+        help="Path to the output json file (default: presentation.json)",
     )
 
     parser.add_argument(

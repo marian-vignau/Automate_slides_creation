@@ -210,13 +210,13 @@ if __name__ == "__main__":
     template_ppt = args.template
     output_ppt = args.output
     fn = Path(source_json).expanduser().resolve()
-    if not fn.exists():
+    if not fn.exists() or not fn.is_file():
         sys.exit(f"Source JSON file not found: {source_json}")
 
     template_path = None
     if template_ppt:
         fn = Path(template_ppt).expanduser().resolve()
-        if not fn.exists():
+        if not fn.exists() or not fn.is_file():
             sys.exit(f"Template file not found: {template_ppt}")
         template_path = str(fn)
     stats = create_presentation(
